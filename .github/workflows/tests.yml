@@ -11,10 +11,10 @@ jobs:
       matrix:
         python-version: [3.7, 3.6, 3.8]
         os:
-          - ubuntu-latest
+          - ubuntu-20.04 # latest
           - ubuntu-18.04
           - ubuntu-16.04
-          - macOS-latest
+          - macOS-11 # latest
           - macOS-10.14
 
     steps:
