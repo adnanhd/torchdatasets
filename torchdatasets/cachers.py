@@ -301,7 +301,7 @@ class Tensor(Cacher):
         Name of the item will be equal to `{self.path}/{index}{extension}`.
 
         """
-        torch.load(
+        return torch.load(
             (self.path / str(index)).with_suffix(self.extension),
             map_location=self.map_location,
             pickle_module=self.pickle_module,
