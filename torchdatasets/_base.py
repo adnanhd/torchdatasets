@@ -15,7 +15,7 @@ from ._dev_utils import apply_mapping, reversed_enumerate
 ################################################################################
 
 
-class MetaIterable(type):
+class MetaIterable(abc.ABCMeta):
     """MetaClass allowing objects to perform dataset related operations.
 
     Operations implemented by MetaIterable
@@ -56,7 +56,7 @@ class MetaIterable(type):
         return __iter__
 
 
-class MetaDataset(type):
+class MetaDataset(abc.ABCMeta):
     """MetaClass allowing objects to perform dataset related operations.
 
     Operations implemented by MetaBase:

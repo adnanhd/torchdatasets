@@ -1,7 +1,8 @@
 import torch
 
 import torchdatasets
-import torchvision
+import pytest
+torchvision = pytest.importorskip("torchvision")
 
 from .utils import enumerate_step
 

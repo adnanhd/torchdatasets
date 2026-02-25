@@ -2,7 +2,8 @@ import pathlib
 
 import torch
 import torchdatasets
-import torchfunc
+import pytest
+torchfunc = pytest.importorskip("torchfunc")
 
 from .datasets import ExampleDataset, ExampleTensorDataset
 from .utils import artificial_slowdown, index_is_sample, is_on_disk

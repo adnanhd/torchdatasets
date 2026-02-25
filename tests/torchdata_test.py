@@ -3,7 +3,8 @@ import time
 import torch
 
 import torchdatasets
-import torchfunc
+import pytest
+torchfunc = pytest.importorskip("torchfunc")
 
 from .datasets import ExampleDataset, ExampleIterable
 from .utils import artificial_slowdown, enumerate_step, index_is_sample

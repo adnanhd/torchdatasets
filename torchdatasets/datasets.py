@@ -29,16 +29,6 @@ from torch.utils.data import TensorDataset as TorchTensorDataset
 from ._base import Base, MetaDataset, MetaIterable
 from .cachers import Memory
 
-try:
-    from typing import GenericMeta
-except ImportError:
-    # in python > 3.7, genericmeta doesn't exist
-    class GenericMeta(type): pass
-
-class MetaIterableWrapper(MetaIterable, GenericMeta):
-    pass
-
-
 class _DatasetBase(Base):
     def __init__(self, concat_object, chain_object):
         self._maps = []
@@ -163,7 +153,7 @@ class _DatasetBase(Base):
         return self._chain_object((self, other))
 
 
-class Iterable(TorchIterable, _DatasetBase, metaclass=MetaIterableWrapper):
+class Iterable(TorchIterable, _DatasetBase, metaclass=MetaIterable):
     r"""`torch.utils.data.IterableDataset` **dataset with extended capabilities**.
 
     This class inherits from
@@ -237,10 +227,9 @@ class Iterable(TorchIterable, _DatasetBase, metaclass=MetaIterableWrapper):
         return self
 
 
-class MetaDatasetWrapper(MetaDataset, GenericMeta): pass
 
 
-class Dataset(TorchDataset, _DatasetBase, metaclass=MetaDatasetWrapper):
+class Dataset(TorchDataset, _DatasetBase, metaclass=MetaDataset):
     r"""`torch.utils.data.Dataset` **with extended capabilities.**
 
     This class inherits from
