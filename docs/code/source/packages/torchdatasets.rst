@@ -1,7 +1,7 @@
-torchdata
+torchdatasets
 =================
 
-.. automodule:: torchdata
+.. automodule:: torchdatasets
     :members:
     :undoc-members:
     :inherited-members:
