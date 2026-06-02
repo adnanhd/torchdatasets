@@ -1,7 +1,7 @@
-torchdata.datasets
+torchdatasets.datasets
 ==================
 
-.. automodule:: torchdata.datasets
+.. automodule:: torchdatasets.datasets
     :special-members:
     :members:
     :exclude-members: Dataset, Iterable

@@ -1,6 +1,6 @@
-torchdata.maps
+torchdatasets.maps
 =====================
 
-.. automodule:: torchdata.maps
+.. automodule:: torchdatasets.maps
     :members:
     :undoc-members:

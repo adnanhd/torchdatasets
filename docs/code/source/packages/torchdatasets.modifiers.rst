@@ -1,7 +1,7 @@
-torchdata.modifiers
+torchdatasets.modifiers
 ==========================
 
-.. automodule:: torchdata.modifiers
+.. automodule:: torchdatasets.modifiers
     :special-members:
     :members:
     :undoc-members:
