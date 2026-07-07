@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: py${{ matrix.python-version }} · torch ${{ matrix.torch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      # Coverage strategy (hand-maintained — add a row when a new torch minor or
+      # python version ships):
+      #   * torch axis: every torch minor 1.8 -> 2.12 is run once on an anchor
+      #     python it supports (3.9 for the 1.x line, 3.10 for the 2.x line).
+      #   * python axis: every python minor 3.7 -> 3.14 is run against the newest
+      #     torch that still supports it (3.7 -> 1.13, 3.8 -> 2.4, 3.14 -> 2.12).
+      matrix:
+        include:
+          # --- torch axis (1.x on py3.9, 2.x on py3.10) ---
+          - { torch: "1.8.1", python-version: "3.9", os: ubuntu-22.04 }
+          - { torch: "1.9.1", python-version: "3.9", os: ubuntu-22.04 }
+          - { torch: "1.10.2", python-version: "3.9", os: ubuntu-22.04 }
+          - { torch: "1.11.0", python-version: "3.9", os: ubuntu-22.04 }
+          - { torch: "1.12.1", python-version: "3.9", os: ubuntu-22.04 }
+          - { torch: "1.13.1", python-version: "3.9", os: ubuntu-22.04 }
+          - { torch: "2.0.1", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.1.2", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.2.2", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.3.1", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.4.1", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.5.1", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.6.0", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.7.1", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.8.0", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.9.1", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.10.0", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.11.0", python-version: "3.10", os: ubuntu-latest }
+          - { torch: "2.12.1", python-version: "3.10", os: ubuntu-latest }
+          # --- python axis (newest torch that still supports each python) ---
+          - { torch: "1.13.1", python-version: "3.7", os: ubuntu-22.04 }
+          - { torch: "2.4.1", python-version: "3.8", os: ubuntu-22.04 }
+          - { torch: "2.8.0", python-version: "3.9", os: ubuntu-latest }
+          - { torch: "2.12.1", python-version: "3.11", os: ubuntu-latest }
+          - { torch: "2.12.1", python-version: "3.12", os: ubuntu-latest }
+          - { torch: "2.12.1", python-version: "3.13", os: ubuntu-latest }
+          - { torch: "2.12.1", python-version: "3.14", os: ubuntu-latest }
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install pinned torch (CPU wheels)
+        run: |
+          python -m pip install --upgrade pip
+          TORCH="${{ matrix.torch }}"
+          MAJOR="${TORCH%%.*}"
+          REST="${TORCH#*.}"; MINOR="${REST%%.*}"
+          # torch < 2.4 was built against the numpy 1.x C-ABI; numpy 2 breaks
+          # `import torch` on those wheels. torch 2.4+ supports numpy 2.
+          NP=""
+          if [ "$MAJOR" = "1" ] || { [ "$MAJOR" = "2" ] && [ "$MINOR" -lt 4 ]; }; then
+            NP="numpy<2"
+          fi
+          if [ "$MAJOR" = "1" ]; then
+            # Old +cpu wheels live in torch_stable; PyPI still serves the deps.
+            pip install "torch==${TORCH}+cpu" $NP \
+              -f https://download.pytorch.org/whl/torch_stable.html
+          else
+            # 2.x +cpu wheels live in the cpu flavor index; deps come from PyPI.
+            pip install "torch==${TORCH}+cpu" $NP \
+              --index-url https://download.pytorch.org/whl/cpu \
+              --extra-index-url https://pypi.org/simple
+          fi
+
+      - name: Install package and test tools
+        run: |
+          pip install pytest pytest-cov
+          pip install -e . --no-deps
+
+      - name: Report resolved versions
+        run: python -c "import sys, torch; print('python', sys.version); print('torch', torch.__version__)"
+
+      - name: Run tests
+        run: pytest tests/ --cov=torchdatasets --cov-report=xml
+
+  vision:
+    name: torchvision integration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install with vision extra
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install pytest
+          pip install -e . --no-deps
+      - name: Run tests (exercises WrapDataset / torchvision paths)
+        run: pytest tests/ -q
+
+  lint:
+    name: lint (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check torchdatasets/ tests/
+      - run: ruff format --check torchdatasets/ tests/
+
+  typecheck:
+    name: typecheck (mypy --strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install mypy and torch stubs
+        run: |
+          python -m pip install --upgrade pip
+          pip install mypy
+          pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: mypy --strict torchdatasets/
