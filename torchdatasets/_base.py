@@ -1,12 +1,43 @@
+from __future__ import annotations
+
 import abc
 import functools
 import typing
 
-import torch
-from torch.utils.data import ConcatDataset as TorchConcatDataset
-from torch.utils.data import Dataset as TorchDataset
+from torch.utils.data import Dataset as _TorchDataset
+from torch.utils.data import IterableDataset as _TorchIterable
 
 from ._dev_utils import apply_mapping, reversed_enumerate
+
+################################################################################
+#
+#                          TORCH-ADAPTIVE METACLASS BASES
+#
+################################################################################
+
+
+# The metaclass torch gives its dataset base classes is not stable across the
+# supported 1.8 -> 2.x range, so a metaclass we mix onto them has to adapt:
+#   * most versions leave ``Dataset`` / ``IterableDataset`` on the plain ``type``
+#     metaclass inherited from ``typing.Generic`` (Python 3.7+);
+#   * torch 1.9 and 1.10 pin ``IterableDataset`` to a private ``_DataPipeMeta``
+#     (itself an ``ABCMeta`` subclass);
+#   * torch >= 2.0 settles on ``ABCMeta``.
+# Python requires a class's metaclass to be a (non-strict) subclass of every
+# base's metaclass, so mixing a fixed ``ABCMeta`` onto the 1.9/1.10
+# ``_DataPipeMeta`` base raises "metaclass conflict" at class-creation time.
+# Deriving from whatever metaclass the installed torch actually uses - reusing
+# it when it is already ``ABCMeta``-derived so abstractness still works, and
+# falling back to ``ABCMeta`` otherwise - keeps one code path correct on every
+# torch minor (which is exactly what the CI version matrix guards).
+def _metaclass_base(dataset_cls: type) -> type:
+    base = type(dataset_cls)
+    return base if issubclass(base, abc.ABCMeta) else abc.ABCMeta
+
+
+_IterableMetaBase = _metaclass_base(_TorchIterable)
+_DatasetMetaBase = _metaclass_base(_TorchDataset)
+
 
 ################################################################################
 #
@@ -15,7 +46,7 @@ from ._dev_utils import apply_mapping, reversed_enumerate
 ################################################################################
 
 
-class MetaIterable(abc.ABCMeta):
+class MetaIterable(_IterableMetaBase):  # type: ignore[misc,valid-type]
     """MetaClass allowing objects to perform dataset related operations.
 
     Operations implemented by MetaIterable
@@ -26,8 +57,14 @@ class MetaIterable(abc.ABCMeta):
 
     """
 
-    def __new__(cls, name, bases, namespace, *args):
-        iterable = super().__new__(cls, name, bases, namespace)
+    def __new__(
+        cls,
+        name: str,
+        bases: typing.Tuple[type, ...],
+        namespace: typing.Dict[str, typing.Any],
+        *args: typing.Any,
+    ) -> "MetaIterable":
+        iterable: MetaIterable = super().__new__(cls, name, bases, namespace)
         setattr(
             iterable,
             "__iter__",
@@ -36,11 +73,13 @@ class MetaIterable(abc.ABCMeta):
         return iterable
 
     @staticmethod
-    def create__iter__(iter_function):
+    def create__iter__(
+        iter_function: typing.Callable[[typing.Any], typing.Iterator[typing.Any]],
+    ) -> typing.Callable[[typing.Any], typing.Iterator[typing.Any]]:
         """Override default __iter__ to enable filtering and mapping."""
 
         @functools.wraps(iter_function)
-        def __iter__(self):
+        def __iter__(self: typing.Any) -> typing.Iterator[typing.Any]:
             for sample in iter_function(self):
                 for i, filter_function in enumerate(self._filters, 1):
                     sample = apply_mapping(
@@ -56,7 +95,7 @@ class MetaIterable(abc.ABCMeta):
         return __iter__
 
 
-class MetaDataset(abc.ABCMeta):
+class MetaDataset(_DatasetMetaBase):  # type: ignore[misc,valid-type]
     """MetaClass allowing objects to perform dataset related operations.
 
     Operations implemented by MetaBase:
@@ -67,8 +106,14 @@ class MetaDataset(abc.ABCMeta):
 
     """
 
-    def __new__(cls, name, bases, namespace, *args):
-        dataset = super().__new__(cls, name, bases, namespace)
+    def __new__(
+        cls,
+        name: str,
+        bases: typing.Tuple[type, ...],
+        namespace: typing.Dict[str, typing.Any],
+        *args: typing.Any,
+    ) -> "MetaDataset":
+        dataset: MetaDataset = super().__new__(cls, name, bases, namespace)
         # To be fixed?
         setattr(
             dataset,
@@ -78,13 +123,19 @@ class MetaDataset(abc.ABCMeta):
         return dataset
 
     @staticmethod
-    def create__getitem__(getitem_function):
+    def create__getitem__(
+        getitem_function: typing.Callable[[typing.Any, typing.Any], typing.Any],
+    ) -> typing.Callable[[typing.Any, typing.Any], typing.Any]:
         """Override default __getitem__ to enable caching and mapping.
 
         To see implementation check _dev_utils/base.py.
         """
 
-        def get_sample(self, index, original_getitem):
+        def get_sample(
+            self: typing.Any,
+            index: typing.Any,
+            original_getitem: typing.Callable[[typing.Any, typing.Any], typing.Any],
+        ) -> typing.Tuple[typing.Any, int]:
             # Check whether available in cache, going from latest
             for cacher_index, cacher in reversed_enumerate(self._cachers):
                 if index in cacher:
@@ -111,7 +162,7 @@ class MetaDataset(abc.ABCMeta):
             return sample, most_mappings
 
         @functools.wraps(getitem_function)
-        def __getitem__(self, index):
+        def __getitem__(self: typing.Any, index: typing.Any) -> typing.Any:
             sample, maps_start = get_sample(self, index, getitem_function)
             return apply_mapping(sample, self._maps, maps_start, len(self._maps))
 
