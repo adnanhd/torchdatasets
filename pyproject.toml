@@ -1,0 +1,118 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "torchdatasets"
+version = "0.2.0"
+description = "PyTorch based library focused on data processing and input pipelines in general."
+readme = "README.md"
+requires-python = ">=3.7"
+license = { text = "MIT" }
+authors = [
+    { name = "Szymon Maszke", email = "szymon.maszke@protonmail.com" },
+]
+maintainers = [
+    { name = "Adnan Harun Dogan", email = "adnanharundogan@gmail.com" },
+]
+keywords = [
+    "pytorch",
+    "torch",
+    "data",
+    "datasets",
+    "map",
+    "cache",
+    "memory",
+    "disk",
+    "apply",
+    "database",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "License :: OSI Approved :: MIT License",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = ["torch>=1.8"]
+
+[project.optional-dependencies]
+# Enables td.datasets.WrapDataset tests and torchvision integration
+vision = ["torchvision"]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+    "build",
+    "twine",
+]
+docs = [
+    "sphinx>=7.0",
+    "sphinx-rtd-theme>=2.0",
+    "sphinxcontrib-katex>=0.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/adnanhd/torchdatasets"
+Repository = "https://github.com/adnanhd/torchdatasets"
+Documentation = "https://adnanhd.github.io/torchdatasets/"
+Issues = "https://github.com/adnanhd/torchdatasets/issues"
+
+[tool.setuptools.packages.find]
+include = ["torchdatasets*"]
+
+[tool.setuptools.package-data]
+torchdatasets = ["py.typed"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py37"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+# importorskip guards force runtime imports below module top
+"tests/*" = ["E402"]
+
+[tool.mypy]
+# mypy's own floor is 3.10; runtime 3.7/3.8 compatibility is guaranteed by the
+# CI matrix actually importing the package on those interpreters.
+python_version = "3.10"
+strict = true
+files = ["torchdatasets"]
+
+[[tool.mypy.overrides]]
+module = ["torchvision.*", "torchfunc.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["*_test.py"]
+addopts = "-v --tb=short"
+
+[tool.coverage.run]
+source = ["torchdatasets"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
