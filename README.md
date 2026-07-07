@@ -1,6 +1,6 @@
 ## Package renamed to torchdatasets!
 
-<img align="left" width="256" height="256" src="https://github.com/szymonmaszke/torchdatasets/blob/master/assets/logos/medium.png">
+<img align="left" width="256" height="256" src="https://github.com/adnanhd/torchdatasets/blob/master/assets/logos/medium.png">
 
 * Use `map`, `apply`, `reduce` or `filter` directly on `Dataset` objects
 * `cache` data in RAM/disk or via your own method (partial caching supported)
@@ -11,14 +11,14 @@
 * Support for `torchvision` datasets (e.g. `ImageFolder`, `MNIST`, `CIFAR10`) via `td.datasets.WrapDataset`
 * Minimal overhead (single call to `super().__init__()`)
 
-| Version | Docs | Tests | Coverage | Style | PyPI | Python | PyTorch | Docker | Roadmap |
-|---------|------|-------|----------|-------|------|--------|---------|--------|---------|
-| [![Version](https://img.shields.io/static/v1?label=&message=0.2.0&color=377EF0&style=for-the-badge)](https://github.com/szymonmaszke/torchdatasets/releases) | [![Documentation](https://img.shields.io/static/v1?label=&message=docs&color=EE4C2C&style=for-the-badge)](https://szymonmaszke.github.io/torchdatasets/)  | ![Tests](https://github.com/szymonmaszke/torchdatasets/workflows/test/badge.svg) | ![Coverage](https://img.shields.io/codecov/c/github/szymonmaszke/torchdatasets?label=%20&logo=codecov&style=for-the-badge) | [![codebeat](https://img.shields.io/static/v1?label=&message=CB&color=27A8E0&style=for-the-badge)](https://codebeat.co/projects/github-com-szymonmaszke-torchdatasets-master) | [![PyPI](https://img.shields.io/static/v1?label=&message=PyPI&color=377EF0&style=for-the-badge)](https://pypi.org/project/torchdatasets/) | [![Python](https://img.shields.io/static/v1?label=&message=3.6&color=377EF0&style=for-the-badge&logo=python&logoColor=F8C63D)](https://www.python.org/) | [![PyTorch](https://img.shields.io/static/v1?label=&message=>=1.2.0&color=EE4C2C&style=for-the-badge)](https://pytorch.org/) | [![Docker](https://img.shields.io/static/v1?label=&message=docker&color=309cef&style=for-the-badge)](https://hub.docker.com/r/szymonmaszke/torchdatasets) | [![Roadmap](https://img.shields.io/static/v1?label=&message=roadmap&color=009688&style=for-the-badge)](https://github.com/szymonmaszke/torchdatasets/blob/master/ROADMAP.md) |
+| Version | Docs | Tests | Coverage | PyPI | Python | PyTorch | Roadmap |
+|---------|------|-------|----------|------|--------|---------|---------|
+| [![Version](https://img.shields.io/static/v1?label=&message=0.2.0&color=377EF0&style=for-the-badge)](https://github.com/adnanhd/torchdatasets/releases) | [![Documentation](https://img.shields.io/static/v1?label=&message=docs&color=EE4C2C&style=for-the-badge)](https://adnanhd.github.io/torchdatasets/) | [![Tests](https://github.com/adnanhd/torchdatasets/actions/workflows/ci.yml/badge.svg)](https://github.com/adnanhd/torchdatasets/actions/workflows/ci.yml) | ![Coverage](https://img.shields.io/codecov/c/github/adnanhd/torchdatasets?label=%20&logo=codecov&style=for-the-badge) | [![PyPI](https://img.shields.io/static/v1?label=&message=PyPI&color=377EF0&style=for-the-badge)](https://pypi.org/project/torchdatasets/) | [![Python](https://img.shields.io/static/v1?label=&message=3.7%20|%203.14&color=377EF0&style=for-the-badge&logo=python&logoColor=F8C63D)](https://www.python.org/) | [![PyTorch](https://img.shields.io/static/v1?label=&message=>=1.8&color=EE4C2C&style=for-the-badge)](https://pytorch.org/) | [![Roadmap](https://img.shields.io/static/v1?label=&message=roadmap&color=009688&style=for-the-badge)](https://github.com/adnanhd/torchdatasets/blob/master/ROADMAP.md) |
 
 # :bulb: Examples
 
 __Check documentation here:__
-[https://szymonmaszke.github.io/torchdatasets](https://szymonmaszke.github.io/torchdatasets)
+[https://adnanhd.github.io/torchdatasets](https://adnanhd.github.io/torchdatasets)
 
 ## General example
 
@@ -62,7 +62,7 @@ images = (
     # You can define your own cachers, modifiers, see docs
 )
 ```
-To see what else you can do please check [**torchdatasets documentation**](https://szymonmaszke.github.io/torchdatasets/)
+To see what else you can do please check [**torchdatasets documentation**](https://adnanhd.github.io/torchdatasets/)
 
 ## Integration with `torchvision`
 
@@ -116,28 +116,14 @@ instance to give it additional `caching` and `mapping` powers!
 pip install --user torchdatasets
 ```
 
-### Nightly:
+### From source:
 
 ```shell
-pip install --user torchdatasets-nightly
+pip install --user "git+https://github.com/adnanhd/torchdatasets.git"
 ```
-
-## :whale2: [Docker](https://hub.docker.com/r/szymonmaszke/torchdatasets)
-
-__CPU standalone__ and various versions of __GPU enabled__ images are available
-at [dockerhub](https://hub.docker.com/r/szymonmaszke/torchdatasets/tags).
-
-For CPU quickstart, issue:
-
-```shell
-docker pull szymonmaszke/torchdatasets:18.04
-```
-
-Nightly builds are also available, just prefix tag with `nightly_`. If you are going for `GPU` image make sure you have
-[nvidia/docker](https://github.com/NVIDIA/nvidia-docker) installed and it's runtime set.
 
 # :question: Contributing
 
 If you find any issue or you think some functionality may be useful to others and fits this library, please [open new Issue](https://help.github.com/en/articles/creating-an-issue) or [create Pull Request](https://help.github.com/en/articles/creating-a-pull-request-from-a-fork).
 
-To get an overview of thins one can do to help this project, see [Roadmap](https://github.com/szymonmaszke/torchdatasets/blob/master/ROADMAP.md)
+To get an overview of thins one can do to help this project, see [Roadmap](https://github.com/adnanhd/torchdatasets/blob/master/ROADMAP.md)
