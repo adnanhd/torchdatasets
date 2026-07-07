@@ -13,8 +13,11 @@ are too slow or not good enough for their purposes (see `Cacher` abstract interf
 
 """
 
+from __future__ import annotations
+
 import abc
-import multiprocessing
+import mmap as _mmap
+import os
 import pathlib
 import pickle
 import shutil
@@ -24,6 +27,12 @@ from typing import Optional
 import torch
 
 from ._base import Base
+
+
+def _torch_version() -> typing.Tuple[int, int]:
+    """Return the installed torch's ``(major, minor)`` version as ints."""
+    major, minor = torch.__version__.split("+")[0].split(".")[:2]
+    return int(major), int(minor)
 
 
 class Cacher(Base):
@@ -76,7 +85,7 @@ class Cacher(Base):
 
     # Save if doesn't contain
     @abc.abstractmethod
-    def __getitem__(self, index) -> typing.Any:
+    def __getitem__(self, index: int) -> typing.Any:
         r"""**Retrieve sample from cache.**
 
         **This function MUST return valid data sample and it's users responsibility
@@ -127,13 +136,24 @@ class Pickle(Cacher):
             Path to the folder where samples will be saved and loaded from.
     extension: str
             Extension to use for saved pickle files. Default: `.pkl`
+    protocol: int
+            `pickle` protocol used when writing. Default: `pickle.HIGHEST_PROTOCOL`
+            (protocol 5 on Python >= 3.8, protocol 4 on 3.7). If you share a cache
+            directory between a Python >= 3.8 writer and a Python 3.7 reader, pass
+            `protocol=4`; protocol 5 files cannot be read on 3.7.
 
     """
 
-    def __init__(self, path: pathlib.Path, extension: str = ".pkl"):
-        self.path = path
+    def __init__(
+        self,
+        path: typing.Union[str, pathlib.Path],
+        extension: str = ".pkl",
+        protocol: int = pickle.HIGHEST_PROTOCOL,
+    ):
+        self.path = pathlib.Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
         self.extension = extension
+        self.protocol = protocol
 
     def __contains__(self, index: int) -> bool:
         """**Check whether file exists on disk.**
@@ -142,20 +162,18 @@ class Pickle(Cacher):
         between multiple runs (if you ensure repeatable sampling).
 
         """
-        return pathlib.Path(
-            (self.path / str(index)).with_suffix(self.extension)
-        ).is_file()
+        return os.path.exists((self.path / str(index)).with_suffix(self.extension))
 
-    def __setitem__(self, index: int, data: int):
+    def __setitem__(self, index: int, data: typing.Any) -> None:
         """**Save** `data` **in specified folder.**
 
         Name of the item will be equal to `{self.path}/{index}{extension}`.
 
         """
         with open((self.path / str(index)).with_suffix(self.extension), "wb") as file:
-            pickle.dump(data, file)
+            pickle.dump(data, file, protocol=self.protocol)
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> typing.Any:
         """**Retrieve** `data` **specified by** `index`.
 
         Name of the item will be equal to `{self.path}/{index}{extension}`.
@@ -173,10 +191,10 @@ class Pickle(Cacher):
         if self.path.is_dir():
             shutil.rmtree(self.path)
 
-    def __enter__(self):
+    def __enter__(self) -> "Pickle":
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: typing.Any) -> None:
         self.clean()
 
 
@@ -185,26 +203,41 @@ class Memory(Cacher):
 
     This `cacher` is used by default inside `torchdatasets.Dataset`.
 
+    .. warning::
+
+        The default in-memory ``dict`` lives in the process that creates it.
+        Under ``torch.utils.data.DataLoader(num_workers > 0)`` each worker is a
+        forked process with its **own** copy: entries written inside a worker are
+        never seen by the main process (or by other workers), and with the
+        default ``persistent_workers=False`` every epoch recomputes from scratch.
+        To share a cache across workers, pass a manager dict::
+
+            import multiprocessing
+
+            dataset.cache(td.cachers.Memory(multiprocessing.Manager().dict()))
+
+        note that each hit then pays inter-process communication cost. For
+        multi-worker pipelines an on-disk cacher (``Pickle`` / ``Tensor`` /
+        ``MmapTensor``) is usually the better choice.
+
     Attributes
     ----------
     cache: dict
             Optional, user-provided caching dictionary (i.e. obtained with multiprocessing.Manager)
     """
 
-    def __init__(self, cache: Optional[dict]=None):
-        self.cache = cache
-        if cache is None:
-            self.cache = {}
+    def __init__(self, cache: Optional[typing.Dict[int, typing.Any]] = None):
+        self.cache: typing.Dict[int, typing.Any] = {} if cache is None else cache
 
     def __contains__(self, index: int) -> bool:
         """True if index in dictionary."""
         return index in self.cache
 
-    def __setitem__(self, index: int, data: int):
+    def __setitem__(self, index: int, data: typing.Any) -> None:
         """Adds data to dictionary."""
         self.cache[index] = data
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> typing.Any:
         """Retrieve data from dictionary."""
         return self.cache[index]
 
@@ -246,24 +279,31 @@ class Tensor(Cacher):
         Default: `pickle`
     pickle_protocol: int, optional
         Can be specified to override the default protocol. See `torch.save`.
-        Default: `2` (`pickle` default)
+        Default: `pickle.HIGHEST_PROTOCOL` (protocol 5 on Python >= 3.8, else 4).
+        Higher protocols write smaller files and load `torch.save` payloads
+        markedly faster than the legacy protocol 2. Pass `pickle_protocol=4` if a
+        cache written on Python >= 3.8 must be read back on Python 3.7.
     **pickle_load_args
         optional keyword arguments passed over to :func:`pickle_module.load`
         and :func:`pickle_module.Unpickler`, e.g., :attr:`errors=...`.
-        See `torch.load`
+        See `torch.load`. On torch >= 2.6, which defaults ``weights_only=True``,
+        this cacher passes ``weights_only=False`` so arbitrary cached samples
+        (not just tensors) keep loading. Do not set ``weights_only=True`` here:
+        the safe unpickler rejects the non-tensor payloads a cacher may hold and
+        cannot read the default high pickle protocol.
 
     """
 
     def __init__(
         self,
-        path: pathlib.Path,
+        path: typing.Union[str, pathlib.Path],
         extension: str = ".pt",
-        map_location=None,
-        pickle_module=pickle,
-        pickle_protocol=2,
-        **pickle_load_args
+        map_location: typing.Any = None,
+        pickle_module: typing.Any = pickle,
+        pickle_protocol: int = pickle.HIGHEST_PROTOCOL,
+        **pickle_load_args: typing.Any,
     ):
-        self.path = path
+        self.path = pathlib.Path(path)
         self.path.mkdir(parents=True, exist_ok=True)
         self.extension = extension
         self.map_location = map_location
@@ -278,11 +318,27 @@ class Tensor(Cacher):
         between multiple runs (if you ensure repeatable sampling).
 
         """
-        return pathlib.Path(
-            (self.path / str(index)).with_suffix(self.extension)
-        ).is_file()
+        return os.path.exists((self.path / str(index)).with_suffix(self.extension))
 
-    def __setitem__(self, index: int, data: int):
+    def _load_args(self) -> typing.Dict[str, typing.Any]:
+        """Assemble ``torch.load`` keyword arguments, adapting to the torch build.
+
+        torch 2.6 flipped ``torch.load``'s ``weights_only`` default to ``True``,
+        which refuses arbitrary (non-tensor) pickles. A cacher may hold any
+        sample, so default to ``weights_only=False`` on versions that accept it
+        (the keyword did not exist before torch 1.13), unless the user overrode
+        it. torch also rejects an explicit ``pickle_module`` together with
+        ``weights_only=True``, so ``pickle_module`` is dropped in that case.
+        """
+        args: typing.Dict[str, typing.Any] = dict(self.pickle_load_args)
+        args["map_location"] = self.map_location
+        if _torch_version() >= (1, 13):
+            args.setdefault("weights_only", False)
+        if not args.get("weights_only", False):
+            args["pickle_module"] = self.pickle_module
+        return args
+
+    def __setitem__(self, index: int, data: typing.Any) -> None:
         """**Save** `data` **in specified folder.**
 
         Name of the item will be equal to `{self.path}/{index}{extension}`.
@@ -295,7 +351,7 @@ class Tensor(Cacher):
             pickle_protocol=self.pickle_protocol,
         )
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> typing.Any:
         """**Retrieve** `data` **specified by** `index`.
 
         Name of the item will be equal to `{self.path}/{index}{extension}`.
@@ -303,9 +359,7 @@ class Tensor(Cacher):
         """
         return torch.load(
             (self.path / str(index)).with_suffix(self.extension),
-            map_location=self.map_location,
-            pickle_module=self.pickle_module,
-            **self.pickle_load_args
+            **self._load_args(),
         )
 
     def clean(self) -> None:
@@ -317,8 +371,137 @@ class Tensor(Cacher):
         if self.path.is_dir():
             shutil.rmtree(self.path)
 
-    def __enter__(self):
+    def __enter__(self) -> "Tensor":
         return self
 
-    def __exit__(self, *args):
+    def __exit__(self, *args: typing.Any) -> None:
+        self.clean()
+
+
+class MmapTensor(Tensor):
+    r"""**Disk** `cacher` **whose warm reads are memory-mapped (zero-copy).**
+
+    Behaves exactly like :class:`Tensor` on writes, but retrieves samples with
+    ``torch.load(..., mmap=True)`` so the tensor storage is mapped from the file
+    on demand instead of being copied into RAM. For large samples this makes
+    repeat epochs dramatically faster and keeps resident memory low, especially
+    when the consumer only touches a slice of each sample.
+
+    .. note::
+
+        Memory-mapped loading requires **torch >= 2.1** (the version that added
+        the ``mmap`` argument to ``torch.load``). Constructing this cacher on an
+        older torch raises ``RuntimeError``; use :class:`Tensor` there instead.
+
+    Accepts the same arguments as :class:`Tensor`.
+    """
+
+    def __init__(self, *args: typing.Any, **kwargs: typing.Any):
+        if _torch_version() < (2, 1):
+            raise RuntimeError(
+                "MmapTensor needs torch>=2.1 for torch.load(mmap=True); "
+                f"installed torch is {torch.__version__}. Use cachers.Tensor instead."
+            )
+        super().__init__(*args, **kwargs)
+
+    def __getitem__(self, index: int) -> typing.Any:
+        """**Retrieve** `data` **memory-mapped from disk.**"""
+        return torch.load(
+            (self.path / str(index)).with_suffix(self.extension),
+            mmap=True,
+            **self._load_args(),
+        )
+
+
+class Sharded(Cacher):
+    r"""**Single-file** `cacher` **(LMDB-style) for many small samples.**
+
+    Instead of one file per sample (which costs an ``open``/``close`` and a
+    directory entry per access), every sample is appended to a single blob file
+    while an in-memory ``index -> (offset, length)`` table records where each one
+    lives. Warm reads are served from a single ``mmap`` of the blob, so there is
+    no per-sample syscall or inode overhead. This wins clearly when a dataset has
+    a large number of small samples.
+
+    .. note::
+
+        The offset table is kept in memory, so - unlike :class:`Pickle` /
+        :class:`Tensor` - this cacher reuses data **within a single process/run**
+        (populate on the first epoch, reuse on the rest) rather than across
+        separate runs. It is process-local: do not share one instance across
+        ``DataLoader`` workers. A pre-existing ``data.blob`` left over from an
+        earlier run is discarded on construction, since its offsets are not
+        recoverable. As with the other disk cachers, calling ``clean()`` and then
+        continuing to write is unsupported and will raise.
+
+    Attributes
+    ----------
+    path: pathlib.Path
+        Folder holding the ``data.blob`` file.
+    protocol: int
+        ``pickle`` protocol used for payloads. Default: ``pickle.HIGHEST_PROTOCOL``.
+    """
+
+    def __init__(
+        self,
+        path: typing.Union[str, pathlib.Path],
+        protocol: int = pickle.HIGHEST_PROTOCOL,
+    ):
+        self.path = pathlib.Path(path)
+        self.path.mkdir(parents=True, exist_ok=True)
+        self.blob = self.path / "data.blob"
+        # The offset table lives in memory only, so a blob from a previous run has
+        # no matching index; start clean or appends would land past stale bytes
+        # while offsets are recorded from zero.
+        if self.blob.exists():
+            self.blob.unlink()
+        self.protocol = protocol
+        self._index: typing.Dict[int, typing.Tuple[int, int]] = {}
+        self._writer: typing.Optional[typing.IO[bytes]] = None
+        self._reader: typing.Optional[_mmap.mmap] = None
+        self._offset = 0
+
+    def _close_reader(self) -> None:
+        if self._reader is not None:
+            self._reader.close()
+            self._reader = None
+
+    def __contains__(self, index: int) -> bool:
+        """True if a payload for `index` has been appended to the blob."""
+        return index in self._index
+
+    def __setitem__(self, index: int, data: typing.Any) -> None:
+        """Append `data`'s pickle to the blob and record its offset."""
+        payload = pickle.dumps(data, protocol=self.protocol)
+        if self._writer is None:
+            self._writer = open(self.blob, "ab", buffering=1024 * 1024)
+        # A fresh append grows the file; any existing mmap no longer covers it.
+        self._close_reader()
+        self._writer.write(payload)
+        self._index[index] = (self._offset, len(payload))
+        self._offset += len(payload)
+
+    def __getitem__(self, index: int) -> typing.Any:
+        """Retrieve `index`'s payload zero-copy from the blob's mmap."""
+        offset, length = self._index[index]
+        if self._writer is not None:
+            self._writer.flush()
+        if self._reader is None:
+            with open(self.blob, "rb") as file:
+                self._reader = _mmap.mmap(file.fileno(), 0, access=_mmap.ACCESS_READ)
+        return pickle.loads(self._reader[offset : offset + length])
+
+    def clean(self) -> None:
+        """**Close handles and remove** `self.path` **recursively.**"""
+        self._close_reader()
+        if self._writer is not None:
+            self._writer.close()
+            self._writer = None
+        if self.path.is_dir():
+            shutil.rmtree(self.path)
+
+    def __enter__(self) -> "Sharded":
+        return self
+
+    def __exit__(self, *args: typing.Any) -> None:
         self.clean()
