@@ -15,6 +15,8 @@ After that you can use `map`, `apply` and other functionalities like you normall
 either `torchdatasets.Dataset` or `torchdatasets.Iterable`.
 """
 
+from __future__ import annotations
+
 import abc
 import functools
 import pathlib
@@ -29,13 +31,25 @@ from torch.utils.data import TensorDataset as TorchTensorDataset
 from ._base import Base, MetaDataset, MetaIterable
 from .cachers import Memory
 
+_TBase = typing.TypeVar("_TBase", bound="_DatasetBase")
+_TIterable = typing.TypeVar("_TIterable", bound="Iterable")
+_TDataset = typing.TypeVar("_TDataset", bound="Dataset")
+_TFiles = typing.TypeVar("_TFiles", bound="Files")
+
+
 class _DatasetBase(Base):
-    def __init__(self, concat_object, chain_object):
-        self._maps = []
+    def __init__(
+        self,
+        concat_object: typing.Callable[[typing.Any], typing.Any],
+        chain_object: typing.Callable[[typing.Any], typing.Any],
+    ):
+        self._maps: typing.List[typing.Callable[[typing.Any], typing.Any]] = []
         self._concat_object = concat_object
         self._chain_object = chain_object
 
-    def map(self, function: typing.Callable):
+    def map(
+        self: _TBase, function: typing.Callable[[typing.Any], typing.Any]
+    ) -> _TBase:
         r"""**Map function to each element of dataset.**
 
         Function has no specified signature; it is user's responsibility to ensure
@@ -56,7 +70,7 @@ class _DatasetBase(Base):
         self._maps.append(function)
         return self
 
-    def apply(self, function):
+    def apply(self, function: typing.Callable[..., typing.Any]) -> typing.Any:
         r"""**Apply function to every element of the dataset.**
 
         Specified function has to take Python generator as first argument.
@@ -102,9 +116,11 @@ class _DatasetBase(Base):
                 Value returned by function
 
         """
-        return function((value for value in self))
+        return function(
+            (value for value in typing.cast(typing.Iterable[typing.Any], self))
+        )
 
-    def __or__(self, other):
+    def __or__(self, other: typing.Any) -> typing.Any:
         r"""**Concatenate {self} and another {self} compatible object.**
 
         During iteration, items from both dataset will be returned as `tuple`.
@@ -123,12 +139,10 @@ class _DatasetBase(Base):
                 Proxy object responsible for concatenation between samples.
                 Can be used in the same manner as this object.
 
-        """.format(
-            self=self, concat_object=self._concat_object
-        )
+        """.format(self=self, concat_object=self._concat_object)
         return self._concat_object((self, other))
 
-    def __add__(self, other):
+    def __add__(self, other: typing.Any) -> typing.Any:
         r"""**Chain {self} and another {self} compatible object.**
 
         During iteration, items from self will be returned first and items
@@ -147,13 +161,11 @@ class _DatasetBase(Base):
                 Proxy object responsible for chaining datasets.
                 Can be used in the same manner as this object.
 
-        """.format(
-            self=self, chain_object=self._chain_object
-        )
+        """.format(self=self, chain_object=self._chain_object)
         return self._chain_object((self, other))
 
 
-class Iterable(TorchIterable, _DatasetBase, metaclass=MetaIterable):
+class Iterable(TorchIterable[typing.Any], _DatasetBase, metaclass=MetaIterable):
     r"""`torch.utils.data.IterableDataset` **dataset with extended capabilities**.
 
     This class inherits from
@@ -187,15 +199,17 @@ class Iterable(TorchIterable, _DatasetBase, metaclass=MetaIterable):
     """
 
     @abc.abstractmethod
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
         pass
 
-    def __init__(self):
+    def __init__(self) -> None:
         _DatasetBase.__init__(self, ConcatIterable, ChainIterable)
-        self._filters = []
-        self._which = [0]
+        self._filters: typing.List[typing.Callable[[typing.Any], bool]] = []
+        self._which: typing.List[int] = [0]
 
-    def filter(self, predicate: typing.Callable):
+    def filter(
+        self: _TIterable, predicate: typing.Callable[[typing.Any], bool]
+    ) -> _TIterable:
         r"""**Filtered  data according to** `predicate`.
 
         Values are filtered based on value returned after every operation (including `map`)
@@ -227,9 +241,7 @@ class Iterable(TorchIterable, _DatasetBase, metaclass=MetaIterable):
         return self
 
 
-
-
-class Dataset(TorchDataset, _DatasetBase, metaclass=MetaDataset):
+class Dataset(TorchDataset[typing.Any], _DatasetBase, metaclass=MetaDataset):
     r"""`torch.utils.data.Dataset` **with extended capabilities.**
 
     This class inherits from
@@ -272,20 +284,20 @@ class Dataset(TorchDataset, _DatasetBase, metaclass=MetaDataset):
 
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         _DatasetBase.__init__(self, ConcatDataset, ConcatIterable)
-        self._cachers = []
-        self._which = []
+        self._cachers: typing.List[typing.Any] = []
+        self._which: typing.List[int] = []
 
     @abc.abstractmethod
-    def __len__(self):
+    def __len__(self) -> int:
         pass
 
     @abc.abstractmethod
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> typing.Any:
         pass
 
-    def cache(self, cacher: typing.Callable = None):
+    def cache(self: _TDataset, cacher: typing.Optional[typing.Any] = None) -> _TDataset:
         r"""**Cache data in memory, disk or specify custom caching.**
 
         By default all samples are cached in memory. To change this behaviour specify `cacher`
@@ -312,7 +324,11 @@ class Dataset(TorchDataset, _DatasetBase, metaclass=MetaDataset):
         self._which.append(len(self._maps))
         return self
 
-    def reduce(self, function: typing.Callable, initializer=None):
+    def reduce(
+        self,
+        function: typing.Callable[[typing.Any, typing.Any], typing.Any],
+        initializer: typing.Any = None,
+    ) -> typing.Any:
         r"""**Reduce dataset to single element with function.**
 
         Works like `functools.reduce <https://docs.python.org/3/library/functools.html#functools.reduce>`__.
@@ -346,11 +362,12 @@ class Dataset(TorchDataset, _DatasetBase, metaclass=MetaDataset):
                 Reduced value
 
         """
+        items = typing.cast(typing.Iterable[typing.Any], self)
         if initializer is None:
-            return functools.reduce(function, (item for item in self))
-        return functools.reduce(function, (item for item in self), initializer)
+            return functools.reduce(function, (item for item in items))
+        return functools.reduce(function, (item for item in items), initializer)
 
-    def reset(self, cache: bool = True, maps: bool = True):
+    def reset(self, cache: bool = True, maps: bool = True) -> None:
         r"""**Reset dataset state.**
 
         `cache` and `maps` can be resetted separately.
@@ -403,14 +420,14 @@ class ConcatDataset(Dataset):
 
     """
 
-    def __init__(self, datasets: typing.List):
+    def __init__(self, datasets: typing.List[typing.Any]):
         super().__init__()
         self.datasets = datasets
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> typing.Tuple[typing.Any, ...]:
         return tuple(dataset[index] for dataset in self.datasets)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return min(len(dataset) for dataset in self.datasets)
 
 
@@ -442,21 +459,21 @@ class ConcatIterable(Iterable):
 
     """
 
-    def __init__(self, datasets: typing.List):
+    def __init__(self, datasets: typing.List[typing.Any]):
         super().__init__()
         self.datasets = datasets
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
         yield from zip(*self.datasets)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> typing.Tuple[typing.Any, ...]:
         return tuple(dataset[index] for dataset in self.datasets)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return min(len(dataset) for dataset in self.datasets)
 
 
-class ChainDataset(TorchConcatDataset, Dataset):
+class ChainDataset(TorchConcatDataset[typing.Any], Dataset):
     r"""**Concrete** `torchdatasets.Dataset` **responsible for chaining multiple datasets.**
 
     This class is returned when `+` (logical or operator) is used on instance
@@ -482,7 +499,7 @@ class ChainDataset(TorchConcatDataset, Dataset):
 
     """
 
-    def __init__(self, datasets):
+    def __init__(self, datasets: typing.Iterable[typing.Any]):
         Dataset.__init__(self)
         TorchConcatDataset.__init__(self, datasets)
 
@@ -514,7 +531,7 @@ class ChainIterable(TorchChain, Iterable):
 
     """
 
-    def __init__(self, datasets):
+    def __init__(self, datasets: typing.Iterable[typing.Any]):
         Iterable.__init__(self)
         TorchChain.__init__(self, datasets)
 
@@ -575,7 +592,13 @@ class Files(Dataset):
     """
 
     @classmethod
-    def from_folder(cls, path: pathlib.Path, regex: str = "*", *args, **kwargs):
+    def from_folder(
+        cls,
+        path: typing.Union[str, pathlib.Path],
+        regex: str = "*",
+        *args: typing.Any,
+        **kwargs: typing.Any,
+    ) -> "Files":
         r"""**Create dataset from** `pathlib.Path` **-like object.**
 
         Path should be a directory and will be extended via `glob` method taking `regex`
@@ -583,8 +606,9 @@ class Files(Dataset):
 
         Parameters
         ----------
-        path : pathlib.Path
-                Path object (directory) containing samples.
+        path : str | pathlib.Path
+                Path object (directory) containing samples. Strings are accepted
+                and converted to `pathlib.Path`.
         regex : str, optional
                 Regex to be used  for filtering. Default: `*` (all files)
         *args
@@ -598,23 +622,30 @@ class Files(Dataset):
                 Instance of your file based dataset.
         """
 
-        files = [file for file in path.glob(regex)]
+        files = [file for file in pathlib.Path(path).glob(regex)]
         return cls(files, *args, **kwargs)
 
-    def __init__(self, files: typing.List[pathlib.Path], *args, **kwargs):
+    def __init__(
+        self,
+        files: typing.List[pathlib.Path],
+        *args: typing.Any,
+        **kwargs: typing.Any,
+    ):
         super().__init__()
         self.files = files
         self.args = args
         self.kwargs = kwargs
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.files)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> typing.Any:
         with open(self.files[index], *self.args, **self.kwargs) as file:
             return file
 
-    def filter(self, predicate: typing.Callable):
+    def filter(
+        self: _TFiles, predicate: typing.Callable[[typing.Any], bool]
+    ) -> _TFiles:
         r"""**Remove** `files` **for which predicate returns** `False`**.**
 
         **Note:** This is different from `torchdatasets.Iterable`'s `filter` method,
@@ -634,7 +665,11 @@ class Files(Dataset):
         self.files = [file for file in self.files if predicate(file)]
         return self
 
-    def sort(self, key=None, reverse=False):
+    def sort(
+        self: _TFiles,
+        key: typing.Optional[typing.Callable[[typing.Any], typing.Any]] = None,
+        reverse: bool = False,
+    ) -> _TFiles:
         r"""**Sort files using Python's built-in** `sorted` **method.**
 
         Arguments are passed directly to `sorted`.
@@ -669,7 +704,7 @@ class TensorDataset(TorchTensorDataset, Dataset):
             List of `tensors` to be wrapped.
     """
 
-    def __init__(self, *tensors):
+    def __init__(self, *tensors: typing.Any):
         Dataset.__init__(self)
         TorchTensorDataset.__init__(self, *tensors)
 
@@ -683,16 +718,18 @@ class Generator(Iterable):
             Generator from which one can `yield` via `yield from` syntax.
     """
 
-    def __init__(self, expression):
+    def __init__(self, expression: typing.Iterable[typing.Any]):
         super().__init__()
         self.expression = expression
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
         yield from self.expression
 
 
 class _Wrap:
-    def __getattr__(self, name):
+    dataset: typing.Any
+
+    def __getattr__(self, name: str) -> typing.Any:
         return getattr(self.dataset, name)
 
 
@@ -712,14 +749,14 @@ class WrapDataset(_Wrap, Dataset):
             Dataset to be wrapped
     """
 
-    def __init__(self, dataset):
+    def __init__(self, dataset: typing.Any):
         self.dataset = dataset
         Dataset.__init__(self)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> typing.Any:
         return self.dataset[index]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.dataset)
 
 
@@ -735,9 +772,9 @@ class WrapIterable(_Wrap, Iterable):
             Dataset to be wrapped
     """
 
-    def __init__(self, dataset):
+    def __init__(self, dataset: typing.Any):
         Iterable.__init__(self)
         self.dataset = dataset
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
         yield from self.dataset

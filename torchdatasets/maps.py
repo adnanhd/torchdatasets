@@ -25,6 +25,8 @@ callables taking sample and returning sample after modifications.
 
 """
 
+from __future__ import annotations
+
 import typing
 
 from ._base import Base
@@ -56,12 +58,12 @@ class After(Base):
 
     """
 
-    def __init__(self, samples: int, function: typing.Callable):
+    def __init__(self, samples: int, function: typing.Callable[..., typing.Any]):
         self.samples = samples
         self.function = function
         self._elements_counter = -1
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Any:
         self._elements_counter += 1
         if self._elements_counter > self.samples:
             return self.function(sample)
@@ -127,11 +129,15 @@ class OnSignal(Base):
 
     """
 
-    def __init__(self, signal: typing.Callable[..., bool], function: typing.Callable):
+    def __init__(
+        self,
+        signal: typing.Callable[..., bool],
+        function: typing.Callable[..., typing.Any],
+    ):
         self.signal = signal
         self.function = function
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Any:
         if self.signal():
             return self.function(sample)
         return sample
@@ -160,16 +166,18 @@ class Flatten(Base):
 
     """
 
-    def __init__(self, types: typing.Tuple = (list, tuple)):
+    def __init__(self, types: typing.Tuple[type, ...] = (list, tuple)):
         self.types = types
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Any:
         if not isinstance(sample, self.types):
             return sample
         return Flatten._flatten(sample, self.types)
 
     @staticmethod
-    def _flatten(items, types):
+    def _flatten(
+        items: typing.Any, types: typing.Tuple[type, ...]
+    ) -> typing.Tuple[typing.Any, ...]:
         if isinstance(items, tuple):
             items = list(items)
 
@@ -205,21 +213,21 @@ class Repeat(Base):
 
     """
 
-    def __init__(self, n: int, function: typing.Callable):
+    def __init__(self, n: int, function: typing.Callable[..., typing.Any]):
         self.n = n
         self.function = function
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Any:
         for _ in range(self.n):
             sample = self.function(sample)
         return sample
 
 
 class _Choice(Base):
-    def __init__(self, *indices):
+    def __init__(self, *indices: int):
         self.indices = set(indices)
 
-    def _magic_unpack(self, iterable):
+    def _magic_unpack(self, iterable: typing.Tuple[typing.Any, ...]) -> typing.Any:
         if len(iterable) == 1:
             return iterable[0]
         if len(iterable) == 0:
@@ -258,7 +266,7 @@ class Select(_Choice):
 
     """
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Any:
         return self._magic_unpack(tuple(sample[i] for i in self.indices))
 
 
@@ -295,7 +303,7 @@ class Drop(_Choice):
 
     """
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Any:
         return self._magic_unpack(
             tuple(
                 sample[index]
@@ -334,10 +342,10 @@ class ToAll(Base):
 
     """
 
-    def __init__(self, function: typing.Callable):
+    def __init__(self, function: typing.Callable[..., typing.Any]):
         self.function = function
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Tuple[typing.Any, ...]:
         return tuple(self.function(subsample) for subsample in sample)
 
 
@@ -374,11 +382,11 @@ class To(Base):
 
     """
 
-    def __init__(self, function: typing.Callable, *indices):
+    def __init__(self, function: typing.Callable[..., typing.Any], *indices: int):
         self.function = function
         self.indices = set(indices)
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Tuple[typing.Any, ...]:
         return tuple(
             self.function(subsample) if index in self.indices else subsample
             for index, subsample in enumerate(sample)
@@ -418,11 +426,11 @@ class Except(Base):
 
     """
 
-    def __init__(self, function: typing.Callable, *indices):
+    def __init__(self, function: typing.Callable[..., typing.Any], *indices: int):
         self.function = function
         self.indices = set(indices)
 
-    def __call__(self, sample):
+    def __call__(self, sample: typing.Any) -> typing.Tuple[typing.Any, ...]:
         return tuple(
             self.function(subsample) if index not in self.indices else subsample
             for index, subsample in enumerate(sample)

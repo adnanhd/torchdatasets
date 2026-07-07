@@ -1,5 +1,3 @@
-import typing
-
 import torchdatasets
 
 from .datasets import ExampleDataset
@@ -7,10 +5,10 @@ from .utils import create_dataset_many_samples, index_is_sample, is_none
 
 
 def test_after():
-    dataset = ExampleDataset(0, 25).map(torchdatasets.maps.After(10, lambda x: x ** 2))
+    dataset = ExampleDataset(0, 25).map(torchdatasets.maps.After(10, lambda x: x**2))
     for index, element in enumerate(dataset):
         if index > 10:
-            assert element == index ** 2
+            assert element == index**2
         else:
             assert element == index
 
@@ -25,7 +23,7 @@ def test_onsignal():
 
     handler = Handle()
     dataset = ExampleDataset(0, 25).map(
-        torchdatasets.maps.OnSignal(handler, lambda x: x ** 2)
+        torchdatasets.maps.OnSignal(handler, lambda x: x**2)
     )
     for index, element in enumerate(dataset):
         if index == 10:
@@ -33,7 +31,7 @@ def test_onsignal():
         if index <= 10:
             assert element == index
         else:
-            assert element == index ** 2
+            assert element == index**2
 
 
 def test_repeat():

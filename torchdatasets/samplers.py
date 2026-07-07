@@ -7,10 +7,13 @@ for more examples and information.
 
 """
 
+from __future__ import annotations
+
 import builtins
+import typing
 
 import torch
-from torch.utils.data import RandomSampler, Sampler, SubsetRandomSampler
+from torch.utils.data import RandomSampler, Sampler
 
 from ._base import Base
 
@@ -38,16 +41,22 @@ class RandomSubsetSampler(Base, RandomSampler):
             Default: `None`
     """
 
-    def __init__(self, indices, replacement=False, num_samples=None):
+    def __init__(
+        self,
+        indices: typing.Any,
+        replacement: bool = False,
+        num_samples: typing.Optional[int] = None,
+    ):
         RandomSampler.__init__(self, indices, replacement, num_samples)
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
+        data_source = typing.cast(typing.Sequence[typing.Any], self.data_source)
         for index in RandomSampler.__iter__(self):
-            yield self.data_source[index]
+            yield data_source[index]
 
 
-class _Equalizer(Sampler):
-    def __init__(self, labels: torch.tensor, function):
+class _Equalizer(Sampler[typing.Any]):
+    def __init__(self, labels: torch.Tensor, function: str):
         if len(labels.shape) > 1:
             raise ValueError(
                 "labels can only have a single dimension (N, ), got shape: {}".format(
@@ -58,7 +67,7 @@ class _Equalizer(Sampler):
             torch.nonzero(labels == i, as_tuple=False).flatten()
             for i in torch.unique(labels)
         ]
-        self.samples_per_label = getattr(builtins, function)(map(len, tensors))
+        self.samples_per_label: int = getattr(builtins, function)(map(len, tensors))
         self.samplers = [
             iter(
                 RandomSubsetSampler(
@@ -73,15 +82,15 @@ class _Equalizer(Sampler):
         ]
 
     @property
-    def num_samples(self):
+    def num_samples(self) -> int:
         return self.samples_per_label * len(self.samplers)
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
         for _ in range(self.samples_per_label):
             for index in torch.randperm(len(self.samplers)).tolist():
                 yield next(self.samplers[index])
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_samples
 
 
@@ -102,12 +111,12 @@ class WeightedImbalancedSampler(torch.utils.data.WeightedRandomSampler):
             Tensor containing labels for respective samples.
     """
 
-    def __init__(self, labels, num_samples: int):
+    def __init__(self, labels: torch.Tensor, num_samples: int):
         super().__init__(
             weights=(
                 torch.nn.functional.one_hot(labels)
                 * (1 / torch.bincount(labels).float())
-            ).sum(dim=1),
+            ).sum(dim=1),  # type: ignore[arg-type]
             num_samples=num_samples,
         )
 
@@ -129,7 +138,7 @@ class RandomOverSampler(_Equalizer):
             Tensor containing labels for respective samples.
     """
 
-    def __init__(self, labels):
+    def __init__(self, labels: torch.Tensor):
         super().__init__(labels, "max")
 
 
@@ -149,11 +158,11 @@ class RandomUnderSampler(_Equalizer):
             Tensor containing labels for respective samples.
     """
 
-    def __init__(self, labels: torch.tensor):
+    def __init__(self, labels: torch.Tensor):
         super().__init__(labels, "min")
 
 
-class Distribution(Sampler):
+class Distribution(Sampler[typing.Any]):
     r"""**Sample** `num_samples` **indices from distribution object.**
 
     Parameters
@@ -173,9 +182,9 @@ class Distribution(Sampler):
         self.distribution = distribution
         self.num_samples = num_samples
 
-    def __iter__(self):
+    def __iter__(self) -> typing.Iterator[typing.Any]:
         for _ in range(self.num_samples):
             yield self.distribution.sample()
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.num_samples

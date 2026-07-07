@@ -26,7 +26,10 @@ def artificial_slowdown(sample):
 
 def index_is_sample(dataset, modifier: typing.Callable = None):
     if modifier is None:
-        modifier = lambda x: x
+
+        def modifier(x):
+            return x
+
     for index, sample in enumerate(dataset):
         assert modifier(index) == sample
 

@@ -28,6 +28,8 @@ For most of cases `Lambda` modifier should be sufficient, for example::
 
 """
 
+from __future__ import annotations
+
 import abc
 import typing
 
@@ -60,6 +62,8 @@ class Modifier(Base):
 
 
     """
+
+    cacher: typing.Any
 
     @abc.abstractmethod
     def condition(self, index: int) -> bool:
@@ -121,7 +125,7 @@ class Modifier(Base):
         if self.condition(index):
             self.cacher[index] = data
 
-    def __getitem__(self, index: int):
+    def __getitem__(self, index: int) -> typing.Any:
         r"""**Acts as invisible proxy for** `cacher`'s `__getitem__` **method.**
 
         .. note::
@@ -137,7 +141,7 @@ class Modifier(Base):
         """
         return self.cacher[index]
 
-    def __or__(self, other):
+    def __or__(self, other: "Modifier") -> "Any":
         r"""**If self or other returns True, then use** `cacher`.
 
         .. note::
@@ -162,7 +166,7 @@ class Modifier(Base):
         """
         return Any(self, other)
 
-    def __and__(self, other):
+    def __and__(self, other: "Modifier") -> "All":
         r"""**If self and other returns True, then use** `cacher`.
 
         .. note::
@@ -198,26 +202,26 @@ class _Mix(Modifier):
 
     """
 
-    def __init__(self, *modifiers):
+    def __init__(self, *modifiers: Modifier):
         self.modifiers = modifiers
         self.cacher = modifiers[0].cacher
 
 
 class All(_Mix):
-    __doc__ = _Mix.__doc__.format(
+    __doc__ = _Mix.__doc__.format(  # type: ignore[union-attr]
         r"Return True if all modifiers return True on given sample."
     )
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return all(modifier.condition(index) for modifier in self.modifiers)
 
 
 class Any(_Mix):
-    __doc__ = _Mix.__doc__.format(
+    __doc__ = _Mix.__doc__.format(  # type: ignore[union-attr]
         r"Return True if any modifier returns True on given sample."
     )
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return any(modifier.condition(index) for modifier in self.modifiers)
 
 
@@ -236,10 +240,10 @@ class _Percent(Modifier):
     """
 
     @abc.abstractmethod
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         pass
 
-    def __init__(self, p: float, length: int, cacher):
+    def __init__(self, p: float, length: int, cacher: typing.Any):
         if not 0 < p < 1:
             raise ValueError(
                 "Percentage has to be between 0 and 1, but got {}".format(p)
@@ -249,20 +253,20 @@ class _Percent(Modifier):
 
 
 class UpToPercentage(_Percent):
-    __doc__ = _Percent.__doc__.format(
+    __doc__ = _Percent.__doc__.format(  # type: ignore[union-attr]
         r"""Cache up to percentage of samples leaving the rest untouched."""
     )
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return index < self.threshold
 
 
 class FromPercentage(_Percent):
-    __doc__ = _Percent.__doc__.format(
+    __doc__ = _Percent.__doc__.format(  # type: ignore[union-attr]
         r"""Cache from specified percentage of samples leaving the rest untouched."""
     )
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return index > self.threshold
 
 
@@ -279,29 +283,29 @@ class _Index(Modifier):
     """
 
     @abc.abstractmethod
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         pass
 
-    def __init__(self, index: int, cacher):
+    def __init__(self, index: int, cacher: typing.Any):
         self.index = index
         self.cacher = cacher
 
 
 class UpToIndex(_Index):
-    __doc__ = _Index.__doc__.format(
+    __doc__ = _Index.__doc__.format(  # type: ignore[union-attr]
         r"""Cache up to samples of specified index leaving the rest untouched."""
     )
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return index < self.index
 
 
 class FromIndex(_Index):
-    __doc__ = _Index.__doc__.format(
+    __doc__ = _Index.__doc__.format(  # type: ignore[union-attr]
         r"""Cache samples from specified index leaving the rest untouched."""
     )
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return index > self.index
 
 
@@ -317,11 +321,11 @@ class Indices(Modifier):
 
     """
 
-    def __init__(self, cacher, *indices):
+    def __init__(self, cacher: typing.Any, *indices: int):
         self.cacher = cacher
         self.indices = indices
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return index in self.indices
 
 
@@ -338,8 +342,8 @@ class Lambda(Modifier):
 
     """
 
-    def __init__(self, function: typing.Callable, cacher):
+    def __init__(self, function: typing.Callable[..., bool], cacher: typing.Any):
         self.function = function
 
-    def condition(self, index):
+    def condition(self, index: int) -> bool:
         return self.function(index)

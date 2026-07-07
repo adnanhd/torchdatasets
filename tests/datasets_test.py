@@ -1,7 +1,8 @@
+import pytest
 import torch
 
 import torchdatasets
-import pytest
+
 torchvision = pytest.importorskip("torchvision")
 
 from .utils import enumerate_step
@@ -17,7 +18,9 @@ def test_tensor():
 
 
 def test_generator():
-    dataset = torchdatasets.datasets.Generator(iter(range(50))).filter(lambda i: i % 3 == 0)
+    dataset = torchdatasets.datasets.Generator(iter(range(50))).filter(
+        lambda i: i % 3 == 0
+    )
     for i, elem in enumerate_step(dataset, step=3):
         assert i == elem
 
