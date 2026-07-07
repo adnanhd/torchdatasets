@@ -406,8 +406,10 @@ class MmapTensor(Tensor):
 
     def __getitem__(self, index: int) -> typing.Any:
         """**Retrieve** `data` **memory-mapped from disk.**"""
+        # torch 2.1/2.2 require a ``str`` filename for the mmap path (Path support
+        # was only added in 2.3); str() keeps every supported version happy.
         return torch.load(
-            (self.path / str(index)).with_suffix(self.extension),
+            str((self.path / str(index)).with_suffix(self.extension)),
             mmap=True,
             **self._load_args(),
         )
