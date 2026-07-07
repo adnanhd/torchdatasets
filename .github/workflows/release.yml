@@ -1,0 +1,83 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install build twine
+
+      - name: Read version
+        id: meta
+        run: |
+          version=$(python -c "exec(open('torchdatasets/_version.py').read()); print(__version__)")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Sanity-check version against tag
+        if: github.event_name == 'push'
+        run: |
+          tag_version="${GITHUB_REF##*/v}"
+          if [ "$tag_version" != "${{ steps.meta.outputs.version }}" ]; then
+            echo "tag v$tag_version does not match torchdatasets/_version.py ${{ steps.meta.outputs.version }}"
+            exit 1
+          fi
+
+      - run: python -m build
+      - run: twine check dist/*
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish-pypi:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/torchdatasets
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+
+  github-release:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="${GITHUB_REF##*/}"
+          gh release create "$tag" dist/* --title "$tag" --notes-from-tag --verify-tag

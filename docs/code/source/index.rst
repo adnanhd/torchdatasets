@@ -29,8 +29,23 @@ Installation
 
   pip install torchdatasets
 
-The core needs only PyTorch. ``torchvision`` is optional and used by the
-dataset wrappers.
+**torchdatasets** supports Python ``3.7`` to ``3.14`` and PyTorch ``1.8`` to
+``2.12``. The core needs only PyTorch. ``torchvision`` is an optional extra used
+by the dataset wrappers.
+
+Optional dependency extras:
+
+.. code-block:: shell
+
+  pip install torchdatasets[vision]   # torchvision wrappers (td.datasets.WrapDataset)
+  pip install torchdatasets[docs]     # tooling to build these docs
+  pip install torchdatasets[dev]      # test / lint / build toolchain
+
+To install the latest, unreleased version straight from ``master``:
+
+.. code-block:: shell
+
+  pip install "git+https://github.com/adnanhd/torchdatasets.git"
 
 Quick start
 ###########
@@ -56,6 +71,43 @@ Quick start
       .map(torchvision.transforms.ToTensor())   # apply a transform
       .cache()                                   # cache in RAM after first pass
   )
+
+Choosing a cacher
+#################
+
+``cache`` accepts any :class:`torchdatasets.cachers.Cacher`. Pick one based on
+where the samples should live and how many of them there are:
+
+:class:`~torchdatasets.cachers.Memory` (the default)
+    Keeps samples in an in-process Python ``dict``. It is the fastest option but
+    is bounded by RAM and is gone when the process exits. **Footgun:** under
+    ``torch.utils.data.DataLoader(num_workers > 0)`` each worker is a separate
+    forked process with its **own** copy of the dict. Samples cached inside a
+    worker are never seen by the main process or the other workers. With the
+    default ``persistent_workers=False`` every epoch recomputes from scratch. To
+    share a cache across workers, pass a manager dict such as
+    ``td.cachers.Memory(multiprocessing.Manager().dict())``, which then pays an
+    inter-process cost per hit. For most pipelines a disk cacher is the better
+    choice.
+
+:class:`~torchdatasets.cachers.Pickle` / :class:`~torchdatasets.cachers.Tensor`
+    Persist one file per sample on disk, via ``pickle`` and ``torch.save``
+    respectively. The cache survives across separate runs as long as you keep
+    the sampling order and seed reproducible.
+
+:class:`~torchdatasets.cachers.MmapTensor`
+    Like ``Tensor`` on writes, but warm reads are memory-mapped (zero-copy) via
+    ``torch.load(mmap=True)``. Best for large samples: repeat epochs get much
+    faster and resident memory stays low, especially when you touch only a slice
+    of each sample. Requires ``torch >= 2.1``.
+
+:class:`~torchdatasets.cachers.Sharded`
+    A single-file, LMDB-style store. Every sample is appended to one blob, and
+    an in-memory offset index plus an ``mmap`` serve warm reads with no
+    per-sample file ``open``. Best when the dataset has many small samples. The
+    offset index lives in memory, so this cacher reuses data within a single run
+    rather than across runs. Populate it on the first epoch and reuse it on the
+    rest. Do not share it across ``DataLoader`` workers.
 
 Modules
 #######

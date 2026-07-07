@@ -1,0 +1,64 @@
+{
+  "protocols_1MB_tensor": {
+    "proto2": {
+      "write_ms": 0.2756978990510106,
+      "read_ms": 0.11914319125935435,
+      "bytes": 1050153
+    },
+    "proto4": {
+      "write_ms": 0.26708530029281974,
+      "read_ms": 0.1153630344197154,
+      "bytes": 1050153
+    },
+    "proto5": {
+      "write_ms": 0.27620681561529636,
+      "read_ms": 0.11202975874766707,
+      "bytes": 1050153
+    }
+  },
+  "backends_1MB_tensor": {
+    "torch.save_p2": {
+      "write_ms": 6.850941276643425,
+      "read_ms": 0.33983916509896517,
+      "bytes": 1049919
+    },
+    "torch.save_p5": {
+      "write_ms": 8.636486988980323,
+      "read_ms": 0.19392967456951737,
+      "bytes": 1049919
+    },
+    "pickle_p2": {
+      "write_ms": 18.81414607865736,
+      "read_ms": 5.5295876413583755,
+      "bytes": 1579114
+    },
+    "pickle_p5": {
+      "write_ms": 9.73339780466631,
+      "read_ms": 0.23642610060051084,
+      "bytes": 1048988
+    },
+    "numpy.save": {
+      "write_ms": 8.053408190608025,
+      "read_ms": 0.1522783050313592,
+      "bytes": 1048704
+    },
+    "numpy.load_mmap": {
+      "read_ms": 0.05866895616054535
+    }
+  },
+  "fsync_1MB": {
+    "buffered": 8.846308414358646,
+    "buffered_fsync": 34.42518648225814,
+    "unbuffered": 7.380841514095664
+  },
+  "stat_overhead": {
+    "pathlib_is_file_us": 6.656866054981947,
+    "os_path_exists_us": 1.0953285731375217,
+    "torch_load_us": 143.5517962090671,
+    "stat_pct_of_load": 4.637257234515524
+  },
+  "mmap_warm_50MB": {
+    "torch_load_full_ms": 17.85212350077927,
+    "torch_load_mmap_ms": 0.14702634265025458
+  }
+}

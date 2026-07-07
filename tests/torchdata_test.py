@@ -1,9 +1,8 @@
-import time
-
+import pytest
 import torch
 
 import torchdatasets
-import pytest
+
 torchfunc = pytest.importorskip("torchfunc")
 
 from .datasets import ExampleDataset, ExampleIterable
@@ -29,7 +28,7 @@ def test_iterable_filter():
 def test_basic_dataset():
     dataset = ExampleDataset(0, 25).map(lambda sample: sample * sample).cache()
     for index, value in enumerate(dataset):
-        assert index ** 2 == value
+        assert index**2 == value
 
 
 def test_dataset_multiple_cache():
@@ -41,7 +40,7 @@ def test_dataset_multiple_cache():
         .cache()
         .map(lambda sample: sample[0] - sample[-1])
         .cache()
-        .map(lambda sample: sample ** 3)
+        .map(lambda sample: sample**3)
         .cache()
     )
     # Iterate through dataset
@@ -49,7 +48,7 @@ def test_dataset_multiple_cache():
         pass
 
     for index, value in enumerate(dataset):
-        assert index ** 3 == value
+        assert index**3 == value
 
 
 def test_dataset_cache_speedup():
@@ -79,11 +78,11 @@ def test_dataset_complicated_cache():
         .map(torchdatasets.maps.Flatten())
         .cache()
         .map(lambda values: values[1])
-        .map(lambda value: value ** 2)
+        .map(lambda value: value**2)
     )
 
     for index, value in enumerate(dataset):
-        assert index ** 2 == value
+        assert index**2 == value
 
 
 def test_apply():
@@ -117,7 +116,7 @@ def test_dataset_dataloader():
         .cache()
         .map(lambda sample: sample[0] - sample[-1])
         .cache()
-        .map(lambda sample: sample ** 3)
+        .map(lambda sample: sample**3)
         .cache()
     )
     # Iterate through dataset

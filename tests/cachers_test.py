@@ -1,14 +1,17 @@
 import pathlib
 
-import torch
-import torchdatasets
 import pytest
+import torch
+
+import torchdatasets
+
 torchfunc = pytest.importorskip("torchfunc")
+
+from multiprocessing import Manager, Process
 
 from .datasets import ExampleDataset, ExampleTensorDataset
 from .utils import artificial_slowdown, index_is_sample, is_on_disk
 
-from multiprocessing import Process, Manager
 
 def test_pickle_cache_slowdown():
     with torchdatasets.cachers.Pickle(pathlib.Path("./disk")) as pickler:
@@ -41,6 +44,7 @@ def test_tensor_cache():
         for i in range(datapoints):
             assert is_on_disk(path, i, ".pt")
 
+
 def test_memory_cache():
     dataset = (
         ExampleTensorDataset(1000)
@@ -58,7 +62,6 @@ def test_memory_cache():
             pass
         cached_pass = timer.checkpoint()
         assert cached_pass < initial_pass
-
 
 
 def shared_subprocess(cache, refs):
@@ -85,8 +88,9 @@ def shared_subprocess(cache, refs):
 
     assert len(cacher.cache) > 0
 
+
 def test_shared_memory():
-    torch.multiprocessing.set_sharing_strategy('file_system')
+    torch.multiprocessing.set_sharing_strategy("file_system")
 
     manager = Manager()
     cache = manager.dict()
