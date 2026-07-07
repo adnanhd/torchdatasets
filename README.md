@@ -3,11 +3,12 @@
 **PyTorch datasets with `map`, `cache`, `apply`, `reduce` and `filter` built in.**
 
 <p>
-  <a href="https://github.com/adnanhd/torchdatasets/actions/workflows/ci.yml"><img alt="Tests" src="https://github.com/adnanhd/torchdatasets/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/adnanhd/torchdatasets/actions/workflows/ci.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/adnanhd/torchdatasets/ci.yml?branch=master&style=flat-square&label=tests&logo=github&logoColor=white"></a>
   <a href="https://pypi.org/project/torchdatasets/"><img alt="PyPI" src="https://img.shields.io/pypi/v/torchdatasets?style=flat-square&color=377EF0"></a>
   <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.7%20to%203.14-377EF0?style=flat-square&logo=python&logoColor=white"></a>
   <a href="https://pytorch.org/"><img alt="PyTorch" src="https://img.shields.io/badge/pytorch-1.8%20to%202.12-EE4C2C?style=flat-square&logo=pytorch&logoColor=white"></a>
-  <a href="https://adnanhd.github.io/torchdatasets/"><img alt="Docs" src="https://img.shields.io/badge/docs-online-3776AB?style=flat-square"></a>
+  <a href="https://codecov.io/gh/adnanhd/torchdatasets"><img alt="Coverage" src="https://img.shields.io/codecov/c/github/adnanhd/torchdatasets?style=flat-square&logo=codecov&logoColor=white"></a>
+  <a href="https://github.com/adnanhd/torchdatasets/actions/workflows/docs.yml"><img alt="Documentation" src="https://github.com/adnanhd/torchdatasets/actions/workflows/docs.yml/badge.svg"></a>
   <a href="https://github.com/adnanhd/torchdatasets/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green?style=flat-square"></a>
 </p>
 
