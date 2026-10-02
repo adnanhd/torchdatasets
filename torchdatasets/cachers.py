@@ -41,6 +41,7 @@ def _cache_dir(path: typing.Union[str, pathlib.Path]) -> pathlib.Path:
     path.mkdir(parents=True, exist_ok=True)
     return path
 
+
 class Cacher(Base):
     r"""**Interface to fulfil to make object compatible with** `torchdatasets.Dataset.cache` **method.**
 
