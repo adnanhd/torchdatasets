@@ -146,3 +146,13 @@ def test_cache_flow_through_dataset(tmp_path):
     assert calls["n"] == 4  # second pass served from cache
     for a, b in zip(first, second):
         assert torch.equal(a, b)
+
+
+@pytest.mark.parametrize("cacher", ["Pickle", "Tensor", "Sharded"])
+def test_a_home_relative_path_lands_under_home(cacher, tmp_path, monkeypatch):
+    """``~`` is the home folder, never a literal ``~`` folder under the cwd."""
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.chdir(tmp_path)
+    store = getattr(td.cachers, cacher)("~/.cache/mmap")
+    assert store.path == tmp_path / "home" / ".cache" / "mmap"
+    assert store.path.is_dir() and not (tmp_path / "~").exists()
