@@ -35,6 +35,12 @@ def _torch_version() -> typing.Tuple[int, int]:
     return int(major), int(minor)
 
 
+def _cache_dir(path: typing.Union[str, pathlib.Path]) -> pathlib.Path:
+    """The cache folder at *path*, with ``~`` expanded, created if missing."""
+    path = pathlib.Path(path).expanduser()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
 class Cacher(Base):
     r"""**Interface to fulfil to make object compatible with** `torchdatasets.Dataset.cache` **method.**
 
@@ -150,8 +156,7 @@ class Pickle(Cacher):
         extension: str = ".pkl",
         protocol: int = pickle.HIGHEST_PROTOCOL,
     ):
-        self.path = pathlib.Path(path)
-        self.path.mkdir(parents=True, exist_ok=True)
+        self.path = _cache_dir(path)
         self.extension = extension
         self.protocol = protocol
 
@@ -303,8 +308,7 @@ class Tensor(Cacher):
         pickle_protocol: int = pickle.HIGHEST_PROTOCOL,
         **pickle_load_args: typing.Any,
     ):
-        self.path = pathlib.Path(path)
-        self.path.mkdir(parents=True, exist_ok=True)
+        self.path = _cache_dir(path)
         self.extension = extension
         self.map_location = map_location
         self.pickle_module = pickle_module
@@ -449,8 +453,7 @@ class Sharded(Cacher):
         path: typing.Union[str, pathlib.Path],
         protocol: int = pickle.HIGHEST_PROTOCOL,
     ):
-        self.path = pathlib.Path(path)
-        self.path.mkdir(parents=True, exist_ok=True)
+        self.path = _cache_dir(path)
         self.blob = self.path / "data.blob"
         # The offset table lives in memory only, so a blob from a previous run has
         # no matching index; start clean or appends would land past stale bytes
