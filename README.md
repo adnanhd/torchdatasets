@@ -4,7 +4,6 @@
 
 <p>
   <a href="https://github.com/adnanhd/torchdatasets/actions/workflows/ci.yml"><img alt="Tests" src="https://img.shields.io/github/actions/workflow/status/adnanhd/torchdatasets/ci.yml?branch=master&style=flat-square&label=tests&logo=github&logoColor=white"></a>
-  <a href="https://pypi.org/project/torchdatasets/"><img alt="PyPI" src="https://img.shields.io/pypi/v/torchdatasets?style=flat-square&color=377EF0"></a>
   <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/python-3.7%20to%203.14-377EF0?style=flat-square&logo=python&logoColor=white"></a>
   <a href="https://pytorch.org/"><img alt="PyTorch" src="https://img.shields.io/badge/pytorch-1.8%20to%202.12-EE4C2C?style=flat-square&logo=pytorch&logoColor=white"></a>
   <a href="https://codecov.io/gh/adnanhd/torchdatasets"><img alt="Coverage" src="https://img.shields.io/codecov/c/github/adnanhd/torchdatasets?style=flat-square&logo=codecov&logoColor=white"></a>
@@ -18,8 +17,11 @@
 familiar from `tensorflow.data`, adding only a single `super().__init__()` call
 to your dataset.
 
-- Use `map`, `apply`, `reduce` and `filter` directly on `Dataset` objects.
-- `cache` data in RAM or on disk, even partially, or through your own cacher.
+- Use `map` and `apply` on any dataset, `cache` and `reduce` on map-style
+  `Dataset` objects and `filter` on `Iterable` ones.
+- `cache` data in RAM or on disk, even partially, or through your own cacher:
+  `Memory`, `Pickle`, `Tensor`, memory-mapped `MmapTensor` (torch 2.1 or
+  later) and single-file `Sharded` in `torchdatasets.cachers`.
 - Full PyTorch [`Dataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.Dataset) and [`IterableDataset`](https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset) support.
 - General maps such as `Flatten` and `Select` in `torchdatasets.maps`.
 - Ready-made datasets for common tasks like file reading.
@@ -30,24 +32,21 @@ to your dataset.
 
 ## Installation
 
-Latest release from PyPI:
-
-```shell
-pip install torchdatasets
-```
-
-Latest development version from source:
+Install from source:
 
 ```shell
 pip install "git+https://github.com/adnanhd/torchdatasets.git"
 ```
+
+The `torchdatasets` 0.2.0 on PyPI is the upstream release by Szymon Maszke;
+it lacks the `MmapTensor` and `Sharded` cachers of this repository.
 
 `torchdatasets` supports Python 3.7 to 3.14 and PyTorch 1.8 to 2.12. The core
 depends only on PyTorch. Install the `vision` extra for the `torchvision`
 wrappers:
 
 ```shell
-pip install "torchdatasets[vision]"
+pip install "torchdatasets[vision] @ git+https://github.com/adnanhd/torchdatasets.git"
 ```
 
 ## Quick start
@@ -79,18 +78,25 @@ class Images(td.Dataset):          # inherit from torchdatasets.Dataset
 images = Images("./data").map(torchvision.transforms.ToTensor()).cache()
 ```
 
-Concatenate two datasets with `|` and iterate as usual:
+Join two datasets sample-wise with `|` (the result has the shorter length)
+and iterate as usual (`labels` is any other dataset):
 
 ```python
 for data, label in images | labels:
     ...
 ```
 
-Cache the first `1000` samples in RAM and the rest on disk:
+`td.datasets.Files` reads one file per sample and has a `from_folder`
+constructor. Cache the first `1000` samples in RAM and the rest on disk:
 
 ```python
+class ImageFiles(td.datasets.Files):
+    def __getitem__(self, index):
+        return Image.open(self.files[index])
+
+
 images = (
-    Images.from_folder("./data")
+    ImageFiles.from_folder("./data")
     .map(torchvision.transforms.ToTensor())
     .cache(td.modifiers.UpToIndex(1000, td.cachers.Memory()))
     .cache(td.modifiers.FromIndex(1000, td.cachers.Pickle("./cache")))
@@ -107,14 +113,14 @@ import torchvision
 
 import torchdatasets as td
 
-dataset = td.datasets.WrapDataset(torchvision.datasets.ImageFolder("./images"))
+dataset = torchvision.datasets.ImageFolder("./images")
 
-train_dataset, validation_dataset, test_dataset = torch.utils.data.random_split(
+train_subset, validation_subset, test_subset = torch.utils.data.random_split(
     dataset,
     (int(0.6 * len(dataset)), int(0.2 * len(dataset)), int(0.2 * len(dataset))),
 )
 
-train_dataset.map(
+train_dataset = td.datasets.WrapDataset(train_subset).map(
     td.maps.To(
         torchvision.transforms.Compose(
             [
@@ -125,14 +131,25 @@ train_dataset.map(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
             ]
-        )
-    ),
-    0,  # apply only to the sample, not the label
+        ),
+        0,  # apply only to the sample, not the label
+    )
 )
 ```
 
 `td.datasets.WrapDataset` works with any existing `torch.utils.data.Dataset`,
-giving it caching and mapping powers.
+giving it caching and mapping powers. `random_split` returns plain
+`torch.utils.data.Subset` objects, so wrap a split part before mapping it.
+
+## Tests
+
+```shell
+pip install -e ".[dev,vision]"
+pytest
+```
+
+Test files match `tests/*_test.py`. `bench/` holds the cacher and
+`DataLoader` benchmarks; `bench/REPORT.md` has the results.
 
 ## Documentation
 
